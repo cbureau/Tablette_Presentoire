@@ -1,3 +1,12 @@
+/*
+ *     connect(ScanTime, SIGNAL(timeout()), discoveryAgent, SLOT(stop()));
+ *     connect(discoveryAgent, SIGNAL(canceled()), this, SLOT(startScan()));
+ *
+ *
+ *
+ *
+ *
+ */
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include <QThread>
@@ -7,75 +16,172 @@
 #include <QFileInfo>
 #include <QTextFormat>
 #include <QTime>
+#include <QtNetwork>
+#include <QMenu>
+#include <QDebug>
 
-    MainWindow::MainWindow(AndroidRfComm *bluecom,QWidget *parent) :
-        rfcomm(bluecom),QMainWindow(parent),
-    ui(new Ui::MainWindow)
+
+MainWindow::MainWindow(QString rfcommmac, AndroidRfComm *bluecom,QWidget *parent) :
+    DeviceRfcomm(rfcommmac),rfcomm(bluecom),QMainWindow(parent),
+ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
     player = new QMediaPlayer;
-    QTimer::singleShot(1000, this, SLOT(TimeToInit()));
-
-    Timer_reception_PC();
-
-//==========================WIFI=====================================||
-    connect(&client, SIGNAL(newMessage(QString,QString)),          //||
+    ScanTime = new QTimer(this);
+    ScanTime2 = new QTimer(this);
+    ScanTime3 = new QTimer(this);
+    QTimer::singleShot(700, this, SLOT(TimeToInit()));
+    connect(&client, SIGNAL(newMessage(QString,QString)),
             this, SLOT(appendMessage(QString,QString)));
+    connect(ScanTime, SIGNAL(timeout()), this, SLOT(sendping()));
+        connect(ScanTime2, SIGNAL(timeout()), this, SLOT(PingTest()));
+            connect(ScanTime3, SIGNAL(timeout()), this, SLOT(ping()));
+    Timer_reception_PC();
     myNickName = client.nickName();
     tableFormat.setBorder(0);
- }
-
-
-
-MainWindow::~MainWindow()
+    nbrping = 0;
+}
+void MainWindow::ping()
 {
-    delete ui;
+    nbrping++;
+    if (nbrping == 30)
+    {
+        nbrping = 0;
+        RfcommReload();
+    }
+    if(PingState)
+    {
+        PingState = 0;
+    }
+    else if (PingState == 0)
+    {
+        QProcess::execute("svc wifi enable");
+    }
+
+    QTimer::singleShot(3500, this, SLOT(sendping()));
+}
+void MainWindow::sendping()
+{
+    client.sendMessage(IDMACHINE + "ping");
+    ScanTime2->start(5000);
+}
+void MainWindow::PingTest()
+{
+    qDebug() << "PING TEST\n PING TEST\nPING TEST\nPING TEST\n PING TEST\nPING TEST\n";
+    if (PingState == 0)
+    {
+        QProcess::execute("svc wifi disable");
+    }
+    ping();
 }
 
 
+void MainWindow::ChangeRfcommTel()
+{
+    if (WIFISTATE)
+    {
+        WIFISTATE = 0;
+        QProcess::execute("svc wifi enable");
+    }
+    else
+    {
+        WIFISTATE = 1;
+        QProcess::execute("svc wifi disable");
+    }
+}
+//=============================================================================||
 void MainWindow::appendMessage(const QString &from, const QString &message)
 {
     if (from.isEmpty() || message.isEmpty())
         return;
-/*    if (message.contains("!F" + IDMACHINE))
+    if (message.mid(0,2).contains(IDMACHINE))
     {
-        toldmewhatIshoulddo("F");
-        rfcomm -> sendLine("$F" + IDMACHINE + IDPUPITRE + IDBPTABLETTE);
-    }
-    else if (message.contains("!G"))
-    {
-        toldmewhatIshoulddo("G");
-        rfcomm -> sendLine("$G" + IDMACHINE + IDPUPITRE + IDBPTABLETTE);
-    }*/
-    if (message.contains("!H"))
-    {
-        toldmewhatIshoulddo("H");
-        rfcomm -> sendLine ("$H" + IDMACHINE + IDPUPITRE + IDBPTABLETTE);
-    }
-    else if (message.contains("!L"))
-        rfcomm -> sendLine("$L" + IDMACHINE + IDPUPITRE + message.mid(2,2) + "00" );
-    else if (message.contains("!V"))
-        toldmewhatIshoulddo(message.mid(1,3));
-    else if (message.contains("!OIFG"))
-    {
-        if (ui->pushButton->isHidden())
-            OIFG = 0;
-        else if (!(ui->pushButton->isHidden()))
-            OIFG = 1;
-
-        if (OIFG == 0)
+        if (message.contains("!H"))
         {
-            OIFG = 1;
-            toldmewhatIshoulddo("F");
-            rfcomm -> sendLine("$F" + IDMACHINE + IDPUPITRE + IDBPTABLETTE);
+            toldmewhatIshoulddo("H");
+            rfcomm -> sendLine ("$H" + IDMACHINE + IDPUPITRE + IDBPTABLETTE);
         }
-        else
+        else if (message.contains("!L15"))
+           qApp->quit();
+        else if (message.contains("!L"))
+            rfcomm -> sendLine("$L" + IDMACHINE + IDPUPITRE + message.mid(4,2) + "00" );
+        else if (message.contains("!V"))
+            toldmewhatIshoulddo(message.mid(3,5));
+        else if (message.contains("!OIFG"))
         {
-            OIFG = 0;
-            toldmewhatIshoulddo("G");
-            rfcomm -> sendLine("$G" + IDMACHINE + IDPUPITRE + IDBPTABLETTE);
-         }
+            if (ui->pushButton->isHidden())
+                OIFG = 0;
+            else if (!(ui->pushButton->isHidden()))
+                OIFG = 1;
+
+            if (OIFG == 0)
+            {
+                OIFG = 1;
+                toldmewhatIshoulddo("F");
+                rfcomm -> sendLine("$F" + IDMACHINE + IDPUPITRE + IDBPTABLETTE);
+            }
+            else
+            {
+                OIFG = 0;
+                toldmewhatIshoulddo("G");
+                rfcomm -> sendLine("$G" + IDMACHINE + IDPUPITRE + IDBPTABLETTE);
+             }
+        }
+        else if (message.contains("pong"))
+        {
+            toldmewhatIshoulddo("pong");
+        }
+
     }
+}
+
+void MainWindow::toldmewhatIshoulddo(QString Com)
+{
+    QFile fichier9(GENERALPATH + "img/hs.png");
+    QString volume(Com.mid(0,1));
+
+    if(Com.contains("F"))
+    {
+        bfr = true;
+        ui->pushButton->show();
+    }
+    else if(Com.contains("G"))
+    {
+        bfr = false;
+        ui->pushButton->hide();
+    }
+    else if(Com.contains("H")) //affichage hors service
+    {
+        ui->pushButton->hide();
+        ui->pushButton_2->hide();
+        ui->pushButton_3->hide();
+        ui->pushButton_4->hide();
+        ui->pushButton_5->hide();
+        ui->pushButton_6->hide();
+        ui->pushButton_7->hide();
+        ui->STOP->hide();
+        if(fichier9.exists())
+        {
+            ui->centralWidget->setStyleSheet("background-image: url( /storage/emulated/0/Download/Pupitre/img/hs.png)");
+            ui->centralWidget->show();
+        }
+        player->stop();
+        MyTimer();    // lancement timer
+    }
+    else if (Com.contains("#C"))
+        changemyconfig(Com);
+    else if (Com.contains("pong"))
+    {
+        PingState = 1;
+    }
+    if (volume.contains("V"))
+    {
+        SonString = Com.mid(1); // enleve le "V"
+        qDebug() << SonString;
+        SonValue = SonString.toInt(&ok);
+        player->setVolume(SonValue);
+    }
+
 }
 
 
@@ -90,17 +196,23 @@ void MainWindow::TimeToInit() // INITIALISATION
        IDMACHINE = flux.readLine();
        IDPUPITRE = flux.readLine();
        IDBPTABLETTE = flux.readLine();
+//       VOLUME = flux.readLine();
        TEMPHS = flux.readLine().toInt(&ok,10);
     }
+    fichier.close();
     OIFG = 1;
     VOLUME = 100;
-    fichier.close();
+    BASEVOLUME = VOLUME;
     height = this->geometry().height();
     width  = this->geometry().width();
     heightP = height/100;
     widthP = width/100;
+    TestNumber = 0;
+    CycleNumber = 0;
+    Recapok = 0;
+    PingState = 0;
     ui->gridLayoutWidget->setGeometry(0,0,width,height);
-    ui->horizontalSpacer->changeSize(widthP*11,heightP * 1,QSizePolicy::Maximum,QSizePolicy::Maximum);
+    ui->horizontalSpacer->changeSize(widthP*12,heightP * 1,QSizePolicy::Maximum,QSizePolicy::Maximum);
     ui->horizontalSpacer_4->changeSize(widthP*2,heightP * 1,QSizePolicy::Maximum,QSizePolicy::Maximum);
     ui->horizontalSpacer_3->changeSize(widthP*2,heightP * 1,QSizePolicy::Maximum,QSizePolicy::Maximum);
     ui->horizontalSpacer_9->changeSize(widthP*2,heightP * 1,QSizePolicy::Maximum,QSizePolicy::Maximum);
@@ -108,66 +220,20 @@ void MainWindow::TimeToInit() // INITIALISATION
     ui->verticalSpacer->changeSize(widthP*1,heightP * 15,QSizePolicy::Maximum,QSizePolicy::Maximum);
     ui->verticalSpacer_2->changeSize(widthP*1,heightP * 10,QSizePolicy::Maximum,QSizePolicy::Maximum);
     ui->verticalSpacer_3->changeSize(widthP*1,heightP * 15,QSizePolicy::Maximum,QSizePolicy::Maximum);
+    WIFISTATE = 0;
+    LastDevice = "0";
+    QProcess::execute("svc wifi disable");
     InitMyButton();
-}
-
-
-void MainWindow::on_pushButton_clicked()
-{
-    rfcomm->sendLine("$L" + IDMACHINE + IDPUPITRE + IDBPTABLETTE + "01");
-    player->stop();
-    player->setVolume(VOLUME);
-    player->setMedia(QUrl::fromLocalFile(GENERALPATH + "son/1.mp3"));
-    player->play();
+ //ui->list->hide();
+    ping();
 
 }
-void MainWindow::on_pushButton_2_clicked()
+void MainWindow::RfcommReload()
 {
-    rfcomm->sendLine("$L" + IDMACHINE + IDPUPITRE + IDBPTABLETTE + "02");
-    player->stop();
-    player->setMedia(QUrl::fromLocalFile(GENERALPATH + "son/2.mp3"));
-    player->play();
+    qDebug() << " try rfcomm";
 
-}
-void MainWindow::on_pushButton_3_clicked()
-{
-    rfcomm->sendLine("$L" + IDMACHINE + IDPUPITRE + IDBPTABLETTE + "03");
-    player->stop();
-    player->setVolume(VOLUME);
-    player->setMedia(QUrl::fromLocalFile(GENERALPATH + "son/3.mp3"));
-    player->play();
-}
-void MainWindow::on_pushButton_4_clicked()
-{
-    rfcomm->sendLine("$L" + IDMACHINE + IDPUPITRE + IDBPTABLETTE + "04");
-    player->stop();
-    player->setMedia(QUrl::fromLocalFile(GENERALPATH + "son/4.mp3"));
-    player->play();
-}
-void MainWindow::on_pushButton_5_clicked()
-{
-    rfcomm->sendLine("$L" + IDMACHINE + IDPUPITRE + IDBPTABLETTE + "05");
-    player->stop();
-    player->setMedia(QUrl::fromLocalFile(GENERALPATH + "son/5.mp3"));
-    player->play();
-}
-void MainWindow::on_pushButton_6_clicked()
-{
-    rfcomm->sendLine("$L" + IDMACHINE + IDPUPITRE + IDBPTABLETTE + "06");
-    player->stop();
-    player->setMedia(QUrl::fromLocalFile(GENERALPATH + "son/6.mp3"));
-    player->play();
-}
-void MainWindow::on_pushButton_7_clicked()
-{
-    rfcomm->sendLine("$L" + IDMACHINE + IDPUPITRE + IDBPTABLETTE + "07");
-    player->stop();
-    player->setMedia(QUrl::fromLocalFile(GENERALPATH + "son/7.mp3"));
-    player->play();
-}
-void MainWindow::on_STOP_clicked()
-{
-    player->stop();
+        rfcomm->connect(DeviceRfcomm);
+
 }
 
 /**********************reception rfcomm regulierement *****************/
@@ -201,7 +267,6 @@ void MainWindow::Timer_reception_PC()
 /***********************tempo reaffichage icones apres hors service*************************/
 void MainWindow::MyTimer()
 {
-    QTimer *timer = new QTimer(this);
     QTimer::singleShot(TEMPHS*1000, this, SLOT(MyTimerSlot()));
 }
 
@@ -217,50 +282,6 @@ void MainWindow::MyTimerSlot()
     ui->pushButton_7->show();
     ui->STOP->show();
     ui->centralWidget->setStyleSheet("background-image: url(/storage/emulated/0/Download/Pupitre/img/f.png)");
-}
-
-void MainWindow::toldmewhatIshoulddo(QString Com)
-{
-    QFile fichier9(GENERALPATH + "img/hs.png");
-    QString volume(Com.mid(0,1));
-    
-    if(Com.contains("F"))
-    {
-        bfr = true;
-        ui->pushButton->show();
-    }
-    else if(Com.contains("G"))
-    {
-        bfr = false;
-        ui->pushButton->hide();
-    }
-    else if(Com.contains("H")) //affichage hors service
-    {
-        ui->pushButton->hide();
-        ui->pushButton_2->hide();
-        ui->pushButton_3->hide();
-        ui->pushButton_4->hide();
-        ui->pushButton_5->hide();
-        ui->pushButton_6->hide();
-        ui->pushButton_7->hide();
-        ui->STOP->hide();
-        if(fichier9.exists())
-        {
-            ui->centralWidget->setStyleSheet("background-image: url( /storage/emulated/0/Download/Pupitre/img/hs.png)");
-            ui->centralWidget->show();
-        }
-        player->stop();
-        MyTimer();    // lancement timer
-    }
-    else if (Com.contains("#C"))
-        changemyconfig(Com);
-    if (volume.contains("V"))
-    {
-        SonString = Com.mid(1); // enleve le "V"
-        qDebug() << SonString;
-        SonValue = SonString.toInt(&ok);
-        player->setVolume(SonValue);
-    }
 }
 
 
@@ -319,14 +340,86 @@ void MainWindow::changemyconfig(QString Com)
     QString idmachine       = Com.mid(2,2);
     QString idpupitre       = Com.mid(4,2);
     QString idbptablette    = Com.mid(6,2);
-    QString tempo           = Com.mid(8,3);
+    QString volume          = Com.mid(8,2);
+    QString tempo           = Com.mid(10,3);
+    QString texte           = idmachine + "\n" + idpupitre + "\n" + idbptablette + "\n" + volume + "\n" + tempo;
     QFile FichierConf(GENERALPATH + "config/config.text");
-
+    QTextStream flux(&FichierConf);
     if(FichierConf.exists())
     {
-        if (!FichierConf.open(QIODevice::WriteOnly |  QIODevice::Truncate | QIODevice::Text))
-        {
-//      A CONTINUÉ
-        }
+        FichierConf.open(QIODevice::WriteOnly |  QIODevice::Truncate | QIODevice::Text);
+        flux << texte;
     }
+    FichierConf.close();
+}
+
+void MainWindow::on_pushButton_clicked()
+{
+    rfcomm->sendLine("$L" + IDMACHINE + IDPUPITRE + IDBPTABLETTE + "01");
+    player->stop();
+    player->setVolume(VOLUME);
+    player->setMedia(QUrl::fromLocalFile(GENERALPATH + "son/1.mp3"));
+    player->play();
+    VOLUME = BASEVOLUME;
+
+}
+void MainWindow::on_pushButton_2_clicked()
+{
+    rfcomm->sendLine("$L" + IDMACHINE + IDPUPITRE + IDBPTABLETTE + "02");
+    player->stop();
+    player->setMedia(QUrl::fromLocalFile(GENERALPATH + "son/2.mp3"));
+    player->play();
+    VOLUME = BASEVOLUME;
+}
+
+void MainWindow::on_pushButton_3_clicked()
+{
+    rfcomm->sendLine("$L" + IDMACHINE + IDPUPITRE + IDBPTABLETTE + "03");
+    player->stop();
+    player->setVolume(VOLUME);
+    player->setMedia(QUrl::fromLocalFile(GENERALPATH + "son/3.mp3"));
+    player->play();
+    VOLUME = BASEVOLUME;
+}
+void MainWindow::on_pushButton_4_clicked()
+{
+    rfcomm->sendLine("$L" + IDMACHINE + IDPUPITRE + IDBPTABLETTE + "04");
+    player->stop();
+    player->setMedia(QUrl::fromLocalFile(GENERALPATH + "son/4.mp3"));
+    player->play();
+    VOLUME = BASEVOLUME;
+}
+void MainWindow::on_pushButton_5_clicked()
+{
+    rfcomm->sendLine("$L" + IDMACHINE + IDPUPITRE + IDBPTABLETTE + "05");
+    player->stop();
+    player->setMedia(QUrl::fromLocalFile(GENERALPATH + "son/5.mp3"));
+    player->play();
+    VOLUME = BASEVOLUME;
+}
+void MainWindow::on_pushButton_6_clicked()
+{
+    rfcomm->sendLine("$L" + IDMACHINE + IDPUPITRE + IDBPTABLETTE + "06");
+    player->stop();
+    player->setMedia(QUrl::fromLocalFile(GENERALPATH + "son/6.mp3"));
+    player->play();
+    VOLUME = BASEVOLUME;
+}
+void MainWindow::on_pushButton_7_clicked()
+{
+    rfcomm->sendLine("$L" + IDMACHINE + IDPUPITRE + IDBPTABLETTE + "07");
+    player->stop();
+    player->setMedia(QUrl::fromLocalFile(GENERALPATH + "son/7.mp3"));
+    player->play();
+    VOLUME = BASEVOLUME;
+}
+void MainWindow::on_STOP_clicked()
+{
+    VOLUME = BASEVOLUME;
+    player->stop();
+}
+
+MainWindow::~MainWindow()
+{
+    delete ui;
 }

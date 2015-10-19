@@ -53,6 +53,7 @@ private:
     bool hasEnoughData();
     void processData();
 
+
     QString greetingMessage;
     QString username;
     QTimer pingTimer;

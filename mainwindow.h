@@ -5,8 +5,11 @@
 #include <QMediaPlayer>
 #include "client.h"
 #include <QTextTableFormat>
+#include <QtNetwork>
+#include <QDialog>
+#include <QListWidgetItem>
 
-
+QT_USE_NAMESPACE
 
 namespace Ui {
 class MainWindow;
@@ -17,15 +20,21 @@ class MainWindow : public QMainWindow
     Q_OBJECT
 
 public:
-    explicit MainWindow(AndroidRfComm *bluecomm,QWidget *parent = 0);
+    explicit MainWindow(QString macrfcomm,AndroidRfComm *bluecomm,QWidget *parent = 0);
     ~MainWindow();
     void SaveMyImage(QString Com);
     void SaveMySong(QString Com);
     void InitMyButton();
     void changemyconfig(QString Com);
+
 public slots:
+    void ping();
+    void sendping();
+    void PingTest();
+    void RfcommReload();
     void on_STOP_clicked();    
     void itstime();
+    void ChangeRfcommTel();
     void TimeToInit();
     void on_pushButton_clicked();
     void on_pushButton_2_clicked();
@@ -40,9 +49,16 @@ public slots:
     void MyTimerSlot();
     void Timer_reception_PC();
 private slots:
-
-
 private:
+    int Recapok;
+    int TestNumber;
+    int CycleNumber;
+    int PingState;
+    int nbrping;
+    int BASEVOLUME;
+
+    QString StringRecap;
+    QString StringRecapResult;
     QMediaPlayer *blablaquiveutriendire;
     AndroidRfComm *rfcomm;
     Ui::MainWindow *ui;
@@ -50,7 +66,11 @@ private:
     int VOLUME;
     int TEMPHS;
     int OIFG;
+    int WIFISTATE;
     QTimer *RFTime;
+    QTimer *ScanTime;
+    QTimer *ScanTime2;
+    QTimer *ScanTime3;
     QMediaPlayer *player;
     float height;
     float heightP;
@@ -64,8 +84,11 @@ private:
     QTextTableFormat tableFormat;
     QString SonString;
     int SonValue;
-
-
+    QStringList DeviceList;
+    QStringList DeviceScan;
+    QString     LastDevice;
+    QString     DeviceRfcomm;
+    int TeleCommandePresente;
 };
 
 
